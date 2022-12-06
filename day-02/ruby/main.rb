@@ -5,13 +5,24 @@ require_relative 'puzzel'
 sample = Puzzel::Sample.new.values
 input  = Puzzel::Input.new.values
 
+HANDS = ["Rock", "Paper", "Scissors"]
+TYPE  = ["Loss", "Draw", "Win"]
+
 module Game
+
+  module Support
+
+    def hand
+      self.class.name.split('::').last
+    end
+
+  end
 
   class Play
 
     attr_reader :result
 
-    def initialize(player_1:, player_2:)
+    def initialize(player_1, player_2)
       @player_1 = player_1
       @player_2 = player_2
       @result   = run
@@ -21,187 +32,140 @@ module Game
 
     def run
       case
-      when hand(@player_1) == @player_2.beats
+      when win?
         Result::Win.new(@player_2)
-      when hand(@player_1) == hand(@player_2)
+      when draw?
         Result::Draw.new(@player_2)
       else
         Result::Loss.new(@player_2)
       end
     end
 
-    def hand(c)
-      c.class.name.split('::').last
+    def win?
+      @player_2.beats == @player_1.hand
+    end
+
+    def draw?
+      @player_2.hand == @player_1.hand
     end
 
   end
 
   module Result
 
-    class Loss
-
-      attr_reader :score, :total
+    class Type
+      include Support
 
       def initialize(play)
-        @score = 0
-        @total = @score + play.score
+        @play = play
+      end
+
+      def score
+        Hash[TYPE.zip([0,3,6])][hand]
+      end
+
+      def total
+        score + @play.score
       end
 
     end
 
-    class Draw
-
-      attr_reader :score, :total
-
-      def initialize(play)
-        @score = 3
-        @total = @score + play.score
-      end
-
+    class Loss < Type
     end
 
-    class Win
+    class Draw < Type
+    end
 
-      attr_reader :score, :total
-
-      def initialize(play)
-        @score = 6
-        @total = @score + play.score
-      end
-
+    class Win < Type
     end
 
   end
 
   module RPS
 
-    class Rock
+    class Hand
+      include Support
 
-      attr_reader :score
-
-      def initialize()
-        @score = 1
+      def score
+        Hash[HANDS.zip([1,2,3])][hand]
       end
 
       def beats
-        "Scissors"
+        Hash[HANDS.zip(HANDS.rotate(2))][hand]
       end
 
     end
 
-    class Paper
-
-      attr_reader :score
-
-      def initialize()
-        @score = 2
-      end
-
-      def beats
-        "Rock"
-      end
-
+    class Rock < Hand
     end
 
-    class Scissors
+    class Paper < Hand
+    end
 
-      attr_reader :score
-
-      def initialize()
-        @score = 3
-      end
-
-      def beats
-        "Paper"
-      end
-
+    class Scissors < Hand
     end
 
   end
 
 end
 
-def play(hand)
-  case hand
-  when "A", "X"
-    Game::RPS::Rock.new
-  when "B", "Y"
-    Game::RPS::Paper.new
-  when "C", "Z"
-    Game::RPS::Scissors.new
-  end
+hands = [Game::RPS::Rock.new, Game::RPS::Paper.new, Game::RPS::Scissors.new]
+
+set_1 = ["A", "B", "C"]
+set_2 = ["X", "Y", "Z"]
+
+# # Part 1 Sample
+
+results = sample.map do |players|
+  Game::Play.new(
+    *players.split(" ").map do |play| 
+      hands[(set_1.index(play) || set_2.index(play))].clone
+    end
+  ).result
 end
 
-# Part 1 Sample
+printf(
+  "Day 02: Part 1: [Sample]: Total Score: %6d\n", 
+  results.collect(&:total).inject(&:+)
+)
 
-sample_results = []
+# # Part 1 Input
 
-sample.each do |players|
-
-  play_1, play_2 = players.split(" ")
-
-  sample_results << Game::Play.new(player_1: play(play_1), player_2: play(play_2)).result
-
+results = input.map do |players|
+  Game::Play.new(
+    *players.split(" ").map do |play| 
+      hands[(set_1.index(play) || set_2.index(play))].clone
+    end
+  ).result
 end
 
-p sample_results.collect(&:total).inject(&:+)
+printf(
+  "Day 02: Part 1:  [Input]: Total Score: %6d\n", 
+  results.collect(&:total).inject(&:+)
+)
 
-# Part 1 Input
+# # Part 2 Sample
 
-input_results = []
+set_2 = set_2.rotate(1)
 
-input.each do |players|
-
-  play_1, play_2 = players.split(" ")
-
-  input_results << Game::Play.new(player_1: play(play_1), player_2: play(play_2)).result
-
+results = sample.map do |players|
+  p1, p2 = players.split(" ").map {|p0| (set_1.index(p0) || set_2.index(p0)) }
+  Game::Play.new( hands[p1].clone, hands.rotate(p2)[p1].clone ).result
 end
 
-p input_results.collect(&:total).inject(&:+)
+printf(
+  "Day 02: Part 2: [Sample]: Total Score: %6d\n",
+  results.collect(&:total).inject(&:+)
+)
 
-# Part 2 Sample
+# # Part 2 Input
 
-def counter(play, move)
-  looser = play.beats
-  draw   = play.class.name.split('::').last
-  winner = (["Rock", "Paper", "Scissors"] - [looser, draw]).first
-  case move
-  when "X"
-    eval("Game::RPS::#{looser}.new")
-  when "Y"
-    eval("Game::RPS::#{draw}.new")
-  when "Z"
-    eval("Game::RPS::#{winner}.new")
-  end
+results = input.map do |players|
+  p1, p2 = players.split(" ").map {|p0| (set_1.index(p0) || set_2.index(p0)) }
+  Game::Play.new( hands[p1].clone, hands.rotate(p2)[p1].clone ).result
 end
 
-sample_results = []
-
-sample.each do |players|
-
-  play_1, play_2 = players.split(" ")
-
-  player_1 = play(play_1)
-
-  sample_results << Game::Play.new(player_1: player_1, player_2: counter(player_1, play_2)).result
-
-end
-
-p sample_results.collect(&:total).inject(&:+)
-
-# Part 2 Input
-
-input_results = []
-
-input.each do |players|
-
-  play_1, play_2 = players.split(" ")
-
-  player_1 = play(play_1)
-
-  input_results << Game::Play.new(player_1: player_1, player_2: counter(player_1, play_2)).result
-
-end
-
-p input_results.collect(&:total).inject(&:+)
+printf(
+  "Day 02: Part 2:  [Input]: Total Score: %6d\n",
+  results.collect(&:total).inject(&:+)
+)
